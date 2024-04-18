@@ -20,6 +20,7 @@ from .utils import temp_directory
 
 logger = logging.getLogger(__name__)
 
+
 def get_size_per_page(path):
     try:
         num_pages = len(PdfReader(path).pages)
@@ -27,7 +28,7 @@ def get_size_per_page(path):
         return file_size / num_pages
     except PdfReadError as e:
         logger.error(f"Read failed for path {path}")
-        traceback.print_exc()
+
         raise e
 
 
@@ -39,7 +40,7 @@ def copy_page(pdf_obj, page_num, output_fname):
             pdf_writer.write(out)
     except PdfReadError as e:
         logger.error(f"Read failed for page {page_num}")
-        traceback.print_exc()
+
         raise e
 
 
@@ -64,7 +65,7 @@ def split_pdf(pdf, output_dir):
                 logger.error(
                     f"Generated an exception: {exc} for page {page_num} of {pdf} during splitting"
                 )
-                traceback.print_exc()
+
                 raise exc
 
     return pages
@@ -84,7 +85,6 @@ def pdf_to_text(path):
 
     except (PDFSyntaxError, TypeError):
         logger.error(f"ERROR: Extraction failed for {path}")
-        traceback.print_exc()
 
     text = retstr.getvalue()
     filepath.close()
@@ -93,6 +93,39 @@ def pdf_to_text(path):
     return text.decode("utf-8")  # decode from bytes to text
 
 
+def _extract_txt_from_pdf(pdf_file, split_into_pages=True, process_output=True):
+
+    if not split_into_pages:
+        text = pdf_to_text(pdf_file)
+    else:
+        with temp_directory() as temp_dir:
+            # Split PDF into individual pages
+            pages = split_pdf(pdf_file, temp_dir)
+
+            # Extract text from each page in parallel
+            with ThreadPoolExecutor() as executor:
+                futures = {executor.submit(pdf_to_text, page): page for page in pages}
+
+                texts = {}
+                for future in as_completed(futures):
+                    page = futures[future]
+                    try:
+                        texts[page] = future.result()
+                    except Exception as exc:
+                        logger.error(f"Generated an exception: {exc} for page {page}")
+
+                        raise exc
+
+            # Combine text from all pages
+            text = ""
+            for page in pages:
+                text += texts[page]
+
+    # Post-process text
+    if process_output:
+        text = post_process(text, pdf_file)
+
+    return text
 
 
 def extract_txt_from_pdf(pdf_file, split_into_pages=True, process_output=True):
@@ -107,36 +140,22 @@ def extract_txt_from_pdf(pdf_file, split_into_pages=True, process_output=True):
     Returns:
         str: Extracted text from the PDF file.
     """
-    if not split_into_pages:
-        text = pdf_to_text(pdf_file)
-    else:
-        with temp_directory() as temp_dir:
-            # Split PDF into individual pages
-            pages = split_pdf(pdf_file, temp_dir)
-
-            # Extract text from each page in parallel
-            with ThreadPoolExecutor() as executor:
-                futures = {
-                    executor.submit(pdf_to_text, page): page for page in pages
-                }
-
-                texts = {}
-                for future in as_completed(futures):
-                    page = futures[future]
-                    try:
-                        texts[page] = future.result()
-                    except Exception as exc:
-                        logger.error(f"Generated an exception: {exc} for page {page}")
-                        traceback.print_exc()
-                        raise exc
-
-            # Combine text from all pages
-            text = ""
-            for page in pages:
-                text += texts[page]
-
-    # Post-process text
-    if process_output:
-        text = post_process(text, pdf_file)
-
-    return text
+    try:
+        text = _extract_txt_from_pdf(
+            pdf_file, split_into_pages=split_into_pages, process_output=process_output
+        )
+        return text
+    except PdfReadError:
+        split_into_pages = not split_into_pages
+        logger.error(f"Retrying with split_into_pages={split_into_pages}")
+        try:
+            text = _extract_txt_from_pdf(
+                pdf_file,
+                split_into_pages=split_into_pages,
+                process_output=process_output,
+            )
+            return text
+        except Exception as e:
+            logger.error(f"Failed to extract text from {pdf_file}")
+            traceback.print_exc()
+            raise e
