@@ -132,7 +132,7 @@ def remove_leading_and_trailing_nums(text):
 def cid_percentage(text):
     """
     Detects the amount of cid numbers (an artefact from missing custom fonts) found in a converted pdf.
-    
+
     Example:
 
     "which maintained contacts not least in  the  South  East  Asian  extreme  right.  To  some  extent  during  the
