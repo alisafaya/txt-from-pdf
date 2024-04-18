@@ -22,3 +22,32 @@ pdf_path = "file.pdf"
 text = extract_pdf(pdf_path)
 print(text)
 ```
+
+# CLI Usage
+
+Single file:
+
+```bash
+txt-from-pdf --input file.pdf --output extracted-text 
+```
+
+Multiple files in a directory:
+
+```bash
+txt-from-pdf --input dir-with-pdfs --output extracted-text 
+```
+
+Detailed help:
+
+```bash
+usage: txt-from-pdf [-h] --input INPUT [--output OUTPUT] [--no_filter] [--size SIZE]
+
+txt-from-pdf CLI - Extracts cleaned text from PDF files
+
+options:
+  -h, --help       show this help message and exit
+  --input INPUT    Path to a folder containing PDFs or to a single PDF file. (Required)
+  --output OUTPUT  Output location for the extracted text files. (Optional, default: 'extracted_text')
+  --no_filter      Turn off cleaning the resulting text files. (Optional)
+  --size SIZE      Maximum file size per page in bytes for processing (mostly images). (Optional, default: 300000)
+```

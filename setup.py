@@ -54,7 +54,7 @@ setup(
 #      twine upload dist/* -r pypitest
 #      twine upload dist/* -r pypitest --repository-url=https://test.pypi.org/legacy/
 # 6. Check that you can install it in a virtualenv by running:
-#      pip install -i https://testpypi.python.org/pypi peft
+#      pip install -i https://testpypi.python.org/pypi txt-from-pdf
 # 7. Upload the final version to actual pypi:
 #      twine upload dist/* -r pypi
 # 8. Add release notes to the tag in github once everything is looking hunky-dory.
