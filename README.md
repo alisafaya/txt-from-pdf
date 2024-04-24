@@ -19,7 +19,7 @@ pip install txt-from-pdf
 from txtfrompdf import extract_txt_from_pdf
 
 pdf_path = "file.pdf"
-text = extract_pdf(pdf_path)
+text = extract_txt_from_pdf(pdf_path)
 print(text)
 ```
 
