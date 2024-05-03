@@ -80,7 +80,7 @@ def pdf_to_text(path):
     interpreter = PDFPageInterpreter(manager, device)
 
     try:
-        for page in PDFPage.get_pages(filepath, check_extractable=True):
+        for page in PDFPage.get_pages(filepath, check_extractable=False):
             interpreter.process_page(page)
 
     except (PDFSyntaxError, TypeError):
