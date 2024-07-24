@@ -26,6 +26,7 @@ setup(
         "pypdf ~= 4.2.0",
         "pdfminer.six==20231228",
         "unicodedata2 ~= 15.1.0",
+        "pikepdf ~= 8.15.0",
     ],
     extras_require=extras,
     classifiers=[
