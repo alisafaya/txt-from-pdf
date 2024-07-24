@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import re
 import unicodedata
-
+import pikepdf
+import zlib
 
 """
 from: https://github.com/mattbierbaum/arxiv-public-datasets/blob/f0b8a4fd17e7aeed38465ec00a63eb219fe1672e/arxiv_public_data/fixunicode.py#L92
@@ -88,6 +89,7 @@ unicode_mapping.update(
         r"[\u201C\u201D]": r'"',
         r"[\xad\u2014]": r"-",
         r"\xb7": r"*",
+        r"\u00A1": r"i",  # inverted exclamation mark to i
     }
 )
 
@@ -109,3 +111,63 @@ def fix_unicode(txt: str) -> str:
     for search, replace in unicode_mapping.items():
         txt = re.subn(search, replace, txt)[0]
     return unicodedata.normalize("NFKC", txt)
+
+
+def analyze_pdf_fonts(pdf_path: str) -> dict[str, str]:
+    translation_table = {}
+
+    with pikepdf.Pdf.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            for font_name, font_obj in page.Resources.get("/Font", {}).items():
+                if "/ToUnicode" in font_obj:
+                    tu_stream = font_obj["/ToUnicode"]
+                    decompressed = zlib.decompress(tu_stream.read_raw_bytes())
+                    unicode_map = decompressed.decode("utf-8", errors="ignore")
+
+                    # Parse beginbfchar sections
+                    bfchar_sections = re.findall(
+                        r"beginbfchar(.*?)endbfchar", unicode_map, re.DOTALL
+                    )
+                    for section in bfchar_sections:
+                        pairs = re.findall(
+                            r"<([0-9A-F]{2,4})>\s*<([0-9A-F]{4,6})>", section
+                        )
+                        for src, dst in pairs:
+                            src_char = chr(int(src, 16))
+                            dst_char = chr(int(dst, 16))
+
+                            # Capture any non-standard mapping
+                            if src_char != dst_char:
+                                translation_table[dst_char] = src_char
+
+                    # Parse beginbfrange sections
+                    bfrange_sections = re.findall(
+                        r"beginbfrange(.*?)endbfrange", unicode_map, re.DOTALL
+                    )
+                    for section in bfrange_sections:
+                        ranges = re.findall(
+                            r"<([0-9A-F]{2,4})>\s*<([0-9A-F]{2,4})>\s*<([0-9A-F]{4,6})>",
+                            section,
+                        )
+
+                        for start, end, dst_start in ranges:
+                            start_int = int(start, 16)
+                            end_int = int(end, 16)
+                            dst_start_int = int(dst_start, 16)
+                            for i in range(end_int - start_int + 1):
+                                src_char = chr(start_int + i)
+                                dst_char = chr(dst_start_int + i)
+                                # Capture any non-standard mapping
+                                if src_char != dst_char:
+                                    translation_table[dst_char] = src_char
+
+    return translation_table
+
+
+def handle_custom_fonts(text: bytes, pdf_path: str) -> str:
+    translation_table = analyze_pdf_fonts(pdf_path)
+
+    if "\x00" in translation_table:
+        text = text.replace(b"\x00", translation_table["\x00"].encode())
+
+    return text

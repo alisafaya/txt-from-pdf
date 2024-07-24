@@ -38,7 +38,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Topic :: Scientific/Engineering :: Information Analysis",
         "Topic :: Text Processing",
-        "Topic :: Utilities"
+        "Topic :: Utilities",
     ],
 )
 
