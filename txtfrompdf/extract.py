@@ -57,6 +57,9 @@ def split_pdf(pdf_path: str, output_dir: str):
         pdf_obj = PdfReader(file)
         num_pages = len(pdf_obj.pages)
 
+        if num_pages == 1:
+            return [pdf_path]
+
     # Create chunks of page numbers
     max_workers = os.cpu_count() or 1
     chunk_size = min(max(num_pages // max_workers, 1), 32)
@@ -132,24 +135,26 @@ def _extract_txt_from_pdf(pdf_file, split_into_pages=True, process_output=True):
             # Split PDF into individual pages
             pages = split_pdf(pdf_file_path, temp_dir)
 
-            # Extract text from each page in parallel
-            with ProcessPoolExecutor() as executor:
+            if len(pages) == 1:
+                text = pdf_to_text(pages[0])
+            else:
+                # Extract text from each page in parallel
+                with ProcessPoolExecutor() as executor:
+                    futures = {executor.submit(pdf_to_text, page): page for page in pages}
+                    texts = {}
 
-                futures = {executor.submit(pdf_to_text, page): page for page in pages}
-                texts = {}
+                    for future in as_completed(futures):
+                        page = futures[future]
+                        try:
+                            texts[page] = future.result()
+                        except Exception as exc:
+                            logger.error(f"Generated an exception: {exc} for page {page}")
+                            raise exc
 
-                for future in as_completed(futures):
-                    page = futures[future]
-                    try:
-                        texts[page] = future.result()
-                    except Exception as exc:
-                        logger.error(f"Generated an exception: {exc} for page {page}")
-                        raise exc
-
-            # Combine text from all pages
-            text = ""
-            for page in pages:
-                text += texts[page]
+                # Combine text from all pages
+                text = ""
+                for page in pages:
+                    text += texts[page]
 
     # Post-process text
     if process_output:
