@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import re
 import unicodedata
-import pikepdf
 import zlib
+
+import pikepdf
+
 
 """
 from: https://github.com/mattbierbaum/arxiv-public-datasets/blob/f0b8a4fd17e7aeed38465ec00a63eb219fe1672e/arxiv_public_data/fixunicode.py#L92

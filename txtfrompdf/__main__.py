@@ -35,6 +35,11 @@ def cli_main():
         type=int,
         default=300000,
     )
+    parser.add_argument(
+        "--split_pages",
+        help="Split the output text files by page. (Optional)",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -63,7 +68,7 @@ def cli_main():
             continue
 
         logger.info(f"Extracting: {pdf}")
-        text = extract_txt_from_pdf(pdf, process_output=not args.no_filter)
+        text = extract_txt_from_pdf(pdf, process_output=not args.no_filter, split_into_pages=args.split_pages)
         output_file = os.path.join(
             args.output, f"{os.path.basename(pdf).replace('.pdf', '.txt')}"
         )
