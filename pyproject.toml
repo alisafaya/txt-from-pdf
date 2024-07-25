@@ -17,7 +17,8 @@ known_first_party = "txt-from-pdf"
 known_third_party = [
     "pypdf",
     "pdfminer.six",
-    "unicodedata2"
+    "unicodedata2",
+    "pikepdf"
 ]
 line_length = 88
 lines_after_imports = 2

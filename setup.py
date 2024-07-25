@@ -6,7 +6,7 @@ extras["dev"] = ["black ~= 23.0", "ruff>=0.2"]
 
 setup(
     name="txt-from-pdf",
-    version="1.2.1",
+    version="1.2.2",
     description="Extract clean text from PDFs.",
     license_files=["LICENSE"],
     long_description=open("README.md", "r", encoding="utf-8").read(),
