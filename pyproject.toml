@@ -15,10 +15,8 @@ known-first-party = ["txt-from-pdf"]
 default_section = "FIRSTPARTY"
 known_first_party = "txt-from-pdf"
 known_third_party = [
-    "pypdf",
-    "pdfminer.six",
     "unicodedata2",
-    "pikepdf"
+    "PyMuPDF"
 ]
 line_length = 88
 lines_after_imports = 2
