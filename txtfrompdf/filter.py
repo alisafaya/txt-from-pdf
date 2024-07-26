@@ -1,241 +1,137 @@
 # -*- coding: utf-8 -*-
-"""aggressive-ish pdf cleaning script for language models.
-    Based off: https://gist.github.com/leogao2/8d4662dfb8e58e8c58ef94df5d46413d by Leo Gao"""
-
 import logging
-import os
 import re
+from typing import Dict, List
 
 from .fix_unicode import fix_unicode
 
 
 logger = logging.getLogger(__name__)
 
-lone_accent_dict = {
-    "a´": "á",
-    "e´": "é",
-    "i´": "í",
-    "o´": "ó",
-    "u´": "ú",
-    "a¨": "ä",
-    "e¨": "ë",
-    "i¨": "ï",
-    "o¨": "ö",
-    "u¨": "ü",
-    "a^": "â",
-    "e^": "ê",
-    "i^": "î",
-    "o^": "ô",
-    "u^": "û",
-    "a`": "à",
-    "e`": "è",
-    "i`": "ì",
-    "o`": "ò",
-    "u`": "ù",
-    "a~": "ã",
-    "o~": "õ",
-    "n~": "ñ",
+# fmt: off
+LONE_ACCENT_DICT: Dict[str, str] = {
+    "a´": "á", "e´": "é", "i´": "í", "o´": "ó", "u´": "ú",
+    "a¨": "ä", "e¨": "ë", "i¨": "ï", "o¨": "ö", "u¨": "ü",
+    "a^": "â", "e^": "ê", "i^": "î", "o^": "ô", "u^": "û",
+    "a`": "à", "e`": "è", "i`": "ì", "o`": "ò", "u`": "ù",
+    "a~": "ã", "o~": "õ", "n~": "ñ",
 }
+# fmt: on
 
-lone_accent_dict.update({k.upper(): v.upper() for k, v in lone_accent_dict.items()})
+LONE_ACCENT_DICT.update({k.upper(): v.upper() for k, v in LONE_ACCENT_DICT.items()})
+
+DATE_PATTERN = re.compile(r"\d{1,2}[-/]\d{1,2}[-/]\d{2,4}")
+COMBINING_DIACRITICS = re.compile(r"[\u0300-\u036F]")
+OTHER_DIACRITICS = re.compile(r"(?:\xa8|[\u02C0-\u02DF])")
+CID_PATTERN = re.compile(r"\(cid:[0-9]+\)")
+DOUBLE_WHITESPACE = re.compile(r"\s\s+")
+TAB_PATTERN = re.compile(r"\t")
 
 
-def ditch_combining_diacritics(text):
-    for orig, repl in lone_accent_dict.items():
+def ditch_combining_diacritics(text: str) -> str:
+    for orig, repl in LONE_ACCENT_DICT.items():
         text = text.replace(orig, repl)
-    text = re.sub(r"[\u0300-\u036F]", "", text)
-    return re.sub(r"(?:\xa8|[\u02C0-\u02DF])", "", text)
+    text = COMBINING_DIACRITICS.sub("", text)
+    return OTHER_DIACRITICS.sub("", text)
 
 
-def listdir(x):
-    return [x + "/" + fn for fn in os.listdir(x)]
+def is_date(x: str) -> bool:
+    return bool(DATE_PATTERN.match(x))
 
 
-def id(x):
-    return x
+def header_footer_filter(page: str) -> str:
+    if len(page) < 50:
+        stripped = page.strip()
+        if stripped.startswith("©"):
+            return ""
+        words = stripped.split()
+        if (
+            words
+            and words[0] in ("r", "copyright")
+            and len(words) >= 2
+            and is_date(words[1])
+        ):
+            return ""
+    return page
 
 
-def average_word_length(text):
-    """
-    get average word length of a given text file
+def replace_hyphenated(text: str) -> str:
+    # Handle words split across lines, but not at the start of a line
+    text = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", text)
 
-    :param txt: string
-    :return: float of avg word length
-    """
-    n_words = len(text.split())
-    n_chars = len(text)
-    avgw = n_chars / (n_words + 1)
-    return avgw
+    # Handle extra spaces after hyphens in the middle of a line, but not at the start
+    text = re.sub(r"(\w+)-\s{2,}(\w+)", r"\1-\2", text)
+    return text
 
 
-def mean(x):
-    x = list(x)
-    if not x:
-        return 0
-    return sum(x) / len(x)
+def remove_cid(text: str) -> str:
+    return CID_PATTERN.sub("", text)
 
 
-def nonzero(x):
-    return filter(id, x)
+def filter_double_whitespace(text: str) -> str:
+    return DOUBLE_WHITESPACE.sub(" ", text)
 
 
-def is_letter(x):
-    return x in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+def replace_tabs(text: str) -> str:
+    tab_count = text.count("\t")
+    space_count = text.count(" ")
+    return TAB_PATTERN.sub(" ", text) if tab_count > space_count else text
 
 
-def is_date(x):
-    res = re.match(r".*([1-3][0-9]{3})", x)
-    if res is not None:
-        return True
-    else:
-        return False
+def combine_paragraph_lines(text: str) -> str:
+    lines = text.split("\n")
+    combined_lines = []
 
-
-def header_footer_filter(para):
-    """if para is short & begins with ©, r {date}, copyright {date}, remove para"""
-    try:
-        if len(para) < 50:
-            if para.strip()[0] == "©":
-                return ""
-            elif para.strip()[0] == "r":
-                para_words = para.strip().split(" ")
-                if len(para_words) >= 2:
-                    second_word = para_words[1]
-                    if is_date(second_word):
-                        return ""
-            elif para.strip().split(" ")[0] == "copyright":
-                second_word = para.strip().split(" ")[1]
-                if is_date(second_word):
-                    return ""
-    except Exception:
-        return para
-    return para
-
-
-def all_equal(x):
-    return all(n == x[0] for n in x)
-
-
-def replace_hyphenated(text):
-    text = re.sub(r"-[?\s]\n{1,2}(\w+ *)", r"\1\n", text)
-    return re.sub(r"-\s{1,2}(\w+ *)", r"\1", text)
-
-
-def remove_leading_and_trailing_nums(text):
-    # remove leading and trailing numbers (i.e page nums)
-    text = text.strip()
-    text = re.sub(r"^(\d+)", "", text)
-    text = re.sub(r"(\d+)$", "", text)
-    return text.strip()
-
-
-def cid_percentage(text):
-    """
-    Detects the amount of cid numbers (an artefact from missing custom fonts) found in a converted pdf.
-
-    Example:
-
-    "which maintained contacts not least in  the  South  East  Asian  extreme  right.  To  some  extent  during  the
-    (cid:38)(cid:82)(cid:79)(cid:71)(cid:3) (cid:58)(cid:68)(cid:85)(cid:15)"
-
-    :param text: string
-    :return: float between 0 and 1 representing density of cid nos in string
-    """
-    n_matches = len(re.findall("\(cid:[0-9]+\)", text))
-    if text:
-        return (n_matches * 8) / len(text)
-    else:
-        return 0.0
-
-
-def remove_cid(text):
-    return re.sub("\(cid:[0-9]+\)", "", text)
-
-
-def filter_double_whitespace(text):
-    return re.sub("\s\s+", " ", text)
-
-
-def replace_tabs(text):
-    """
-    Some pdfs have tabs instead of spaces them. this function checks for tabs and replaces them with spaces.
-    """
-    tab_count = len(re.findall("\t", text))
-    space_count = len(re.findall(" ", text))
-
-    if tab_count > space_count:
-        return re.sub("\t", " ", text)
-    else:
-        return text
-
-
-def filter_newlines(text):
-    return re.sub("\n", " ", text)
-
-
-def post_process(text, fn):
-    # check if cid_perc is larger than threshold, it's probably a latex / alt font heavy document.
-    cid_perc = cid_percentage(text)
-    if cid_perc > 0.03:
-        logger.warning("too many font errors - {}.".format(fn))
-
-    # check if mean line len is too short, it's probably garbled, not useful, or overly latex-y
-    whole_doc_mean_line_len = mean(nonzero(map(len, text.split("\n"))))
-    if whole_doc_mean_line_len < 15:
-        logger.warning("avg mean line length too short - {}.".format(fn))
-
-    # check if average word length is too big or small
-    word_length = average_word_length(text)
-    if word_length > 45:
-        logger.warning("avg word length too large - {}.".format(fn))
-    elif word_length < 2:
-        logger.warning("avg word length too short - {}.".format(fn))
-
-    # replace hyphens at end of lines and paragraphs
-    text = replace_hyphenated(text)
-    paras = text.split("\n\n")
-    out = []
-    for para in paras:
-        # filter out new lines in the middle of paragraphs,
-        # remove headers
-        # and remove double whitespaces
-        para = filter_newlines(para)
-        para = header_footer_filter(para)
-        para = filter_double_whitespace(para)
-
-        # if mean line len is too short, it's probably garbled or not useful
-        mean_line_len = mean(nonzero(map(len, para.split("\n"))))
-        if mean_line_len < 2.0:
-            continue
-
-        # if cid_percentage is higher than 10%, it's likely a latex heavy para and won't make sense without it
-        # delete the whole para
-        if cid_percentage(para) > 0.1:
-            continue
-        # not enough letters (i.e math, tables, etc)
-        letterness = mean(map(is_letter, para))
-        if letterness < 0.40:
-            continue
-
-        #   final cleaning steps:
-        #   remove leading and trailing numbers (usually pagenos)
-        #   remove any remaining cid strings
-        #   fix any unicode / ligature related errors
-        #   combine letter -> accent strings from bad decoding to combined letter/accent
-        #   e.g a´ gets converted to á
-        para = ditch_combining_diacritics(
-            fix_unicode(remove_cid(remove_leading_and_trailing_nums(para)))
+    def is_list_item(line: str) -> bool:
+        return bool(
+            re.match(r"^\s*[\-\*•◦▪▫▹▸▻►▼▽◆◇○●]", line)
+            or re.match(r"^\s*(\d+|[a-zA-Z])[.)\]]", line)
         )
 
-        if para != "":
-            # only append if not empty
-            out.append(para)
+    def should_merge(current: str, next: str) -> bool:
+        current = current.strip()
+        next = next.strip()
+        return (
+            current
+            and next
+            and not is_list_item(current)
+            and not is_list_item(next)
+            and not current.endswith(".")
+        )
 
-        # remove empty strings from prev step
-        for i in out:
-            if not i:
-                out.remove(i)
+    i = 0
+    while i < len(lines):
+        current_line = lines[i].strip()
 
-    out = "\n\n".join(out)
-    out = replace_tabs(out).strip()
-    return out
+        # If the current line is empty or a list item, add it as is
+        if not current_line or is_list_item(current_line):
+            combined_lines.append(lines[i])
+            i += 1
+            continue
+
+        # Look ahead to see if we need to merge lines
+        merged_line = current_line
+        while i + 1 < len(lines) and should_merge(merged_line, lines[i + 1]):
+            merged_line += " " + lines[i + 1].strip()
+            i += 1
+
+        combined_lines.append(merged_line)
+        i += 1
+
+    return "\n".join(combined_lines)
+
+
+def post_process(text: str) -> str:
+    text = replace_hyphenated(text)
+    paras = text.split("\n\n")
+    out: List[str] = []
+
+    for para in paras:
+        para = combine_paragraph_lines(para)
+        para = header_footer_filter(para)
+        para = filter_double_whitespace(para)
+        para = ditch_combining_diacritics(fix_unicode(remove_cid(para)))
+        out.append(para)
+
+    out = [para for para in out if para.strip()]
+    return replace_tabs("\n\n".join(out)).strip()

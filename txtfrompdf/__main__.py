@@ -4,8 +4,7 @@ def cli_main():
     import logging
     import os
 
-    from .extract import extract_txt_from_pdf, get_size_per_page
-    from .utils import human_readable_size
+    from .extract import extract_txt_from_pdf
 
     logging.basicConfig(level=logging.INFO)
 
@@ -29,17 +28,6 @@ def cli_main():
         help="Turn off cleaning and filtering of the resulting text files. (Optional)",
         action="store_true",
     )
-    parser.add_argument(
-        "--size",
-        help="Maximum file size per page in bytes for processing (mostly images). (Optional, default: 300000)",
-        type=int,
-        default=300000,
-    )
-    parser.add_argument(
-        "--split_pages",
-        help="Split the output text files by page. (Optional)",
-        action="store_true",
-    )
 
     args = parser.parse_args()
 
@@ -60,15 +48,8 @@ def cli_main():
         logger.warning("Output directory already exists")
 
     for pdf in all_pdfs:
-        size_per_page = get_size_per_page(pdf)
-        if size_per_page > args.size:
-            logger.warning(
-                f"file size per page for {pdf} over cutoff of {human_readable_size(args.size)}: {human_readable_size(size_per_page)}"
-            )
-            continue
-
         logger.info(f"Extracting: {pdf}")
-        text = extract_txt_from_pdf(pdf, process_output=not args.no_filter, split_into_pages=args.split_pages)
+        text = extract_txt_from_pdf(pdf, process_output=not args.no_filter)
         output_file = os.path.join(
             args.output, f"{os.path.basename(pdf).replace('.pdf', '.txt')}"
         )
