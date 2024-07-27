@@ -6,7 +6,7 @@ extras["dev"] = ["black ~= 23.0", "ruff>=0.2"]
 
 setup(
     name="txt-from-pdf",
-    version="1.3.0",
+    version="1.3.1",
     description="Extract clean text from PDFs.",
     license_files=["LICENSE"],
     long_description=open("README.md", "r", encoding="utf-8").read(),
@@ -22,10 +22,7 @@ setup(
         ]
     },
     python_requires=">=3.7.0",
-    install_requires=[
-        "unicodedata2 ~= 15.1.0",
-        "PyMuPDF ~= 1.24.9"
-    ],
+    install_requires=["unicodedata2 ~= 15.1.0", "PyMuPDF ~= 1.24.9"],
     extras_require=extras,
     classifiers=[
         "Intended Audience :: Developers",

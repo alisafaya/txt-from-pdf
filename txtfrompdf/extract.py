@@ -19,12 +19,9 @@ def pdf_to_text(path: Union[str, BytesIO]) -> str:
     elif isinstance(path, str):
         document = pymupdf.open(filename=path)
 
-    text = "\n\n\n".join(
-        [
-            "\n".join([block[4] for block in page.get_text("blocks")])
-            for page in document
-        ]
-    )
+    text = [
+        "\n".join([block[4] for block in page.get_text("blocks")]) for page in document
+    ]
 
     logger.debug(f"Extracted text from {path if isinstance(path, str) else 'BytesIO'}")
     return text
@@ -38,6 +35,8 @@ def _extract_txt_from_pdf(pdf_file, process_output=True):
     if process_output:
         logger.debug("Post-processing extracted text")
         text = post_process(text)
+    else:
+        text = "\n".join(text)
 
     return text
 

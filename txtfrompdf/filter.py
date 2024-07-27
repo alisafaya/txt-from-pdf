@@ -78,28 +78,39 @@ def replace_tabs(text: str) -> str:
     return TAB_PATTERN.sub(" ", text) if tab_count > space_count else text
 
 
-def combine_paragraph_lines(text: str) -> str:
-    lines = text.split("\n")
-    combined_lines = []
+def is_list_item(line: str) -> bool:
+    return bool(
+        re.match(r"^\s*[\-\*•◦▪▫▹▸▻►▼▽◆◇○●]", line)
+        or re.match(r"^\s*(\d+|[a-zA-Z])[.)\]]", line)
+    )
 
-    def is_list_item(line: str) -> bool:
-        return bool(
-            re.match(r"^\s*[\-\*•◦▪▫▹▸▻►▼▽◆◇○●]", line)
-            or re.match(r"^\s*(\d+|[a-zA-Z])[.)\]]", line)
-        )
 
-    def should_merge(current: str, next: str) -> bool:
-        current = current.strip()
-        next = next.strip()
-        return (
-            current
-            and next
-            and not is_list_item(current)
-            and not is_list_item(next)
-            and not current.endswith(".")
-        )
+def is_start_of_sentence(line: str) -> bool:
+    return not bool(re.match(r"^[a-z]", line.strip()))
+
+
+def is_end_of_sentence(line: str) -> bool:
+    return bool(re.match(r".*[.!?]$", line.strip()))
+
+
+def should_merge(current: str, next: str) -> bool:
+    current = current.strip()
+    next = next.strip()
+    return (
+        current
+        and next
+        and not is_list_item(current)
+        and not is_list_item(next)
+        and not is_end_of_sentence(current)
+        and not is_start_of_sentence(next)
+    )
+
+
+def _combine_paragraph_lines(text: str, level: int = 3) -> str:
+    lines = text.split("\n" * level)
 
     i = 0
+    combined_lines = []
     while i < len(lines):
         current_line = lines[i].strip()
 
@@ -118,20 +129,31 @@ def combine_paragraph_lines(text: str) -> str:
         combined_lines.append(merged_line)
         i += 1
 
-    return "\n".join(combined_lines)
+    return ("\n" * level).join(combined_lines).strip()
 
 
-def post_process(text: str) -> str:
-    text = replace_hyphenated(text)
-    paras = text.split("\n\n")
-    out: List[str] = []
+def combine_paragraph_lines(text: str) -> str:
+    three_results = []
+    for three in text.split("\n\n\n"):
+        two_results = []
+        for two in three.split("\n\n"):
+            two_results.append(_combine_paragraph_lines(two, level=1))
 
-    for para in paras:
-        para = combine_paragraph_lines(para)
-        para = header_footer_filter(para)
-        para = filter_double_whitespace(para)
-        para = ditch_combining_diacritics(fix_unicode(remove_cid(para)))
-        out.append(para)
+        three_results.append(
+            _combine_paragraph_lines("\n\n".join(two_results), level=2)
+        )
 
-    out = [para for para in out if para.strip()]
-    return replace_tabs("\n\n".join(out)).strip()
+    return _combine_paragraph_lines("\n\n\n".join(three_results), level=3)
+
+
+def post_process(pages: List[str]) -> str:
+    pages = combine_paragraph_lines("\n\n".join(pages)).split("\n\n")
+
+    processed = []
+    for page in pages:
+        page = replace_hyphenated(page)
+        page = header_footer_filter(page)
+        page = filter_double_whitespace(page)
+        page = ditch_combining_diacritics(fix_unicode(remove_cid(page)))
+        processed.append(page)
+    return "\n\n".join(processed)

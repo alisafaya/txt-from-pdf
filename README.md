@@ -5,7 +5,7 @@
 [![PyPI version](https://badge.fury.io/py/txt-from-pdf.svg)](https://badge.fury.io/py/txt-from-pdf)
 [![GitHub license](https://img.shields.io/github/license/alisafaya/txt-from-pdf.svg)](./LICENSE)
 
-Extracting text from pdfs using [pdfminer.six](https://github.com/pdfminer/pdfminer.six) and [pypdf](https://github.com/py-pdf/pypdf/). Adapted from [PDFextract](https://github.com/sdtblck/PDFextract).
+Extracting text from pdfs using [pymupdf](https://github.com/pymupdf/PyMuPDF/), but with a focus on cleaning and formatting the extracted text. 
 
 # Installation
 
@@ -49,5 +49,4 @@ options:
   --input INPUT    Path to a folder containing PDFs or to a single PDF file. (Required)
   --output OUTPUT  Output location for the extracted text files. (Optional, default: 'extracted_text')
   --no_filter      Turn off cleaning the resulting text files. (Optional)
-  --size SIZE      Maximum file size per page in bytes for processing (mostly images). (Optional, default: 300000)
 ```
